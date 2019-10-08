@@ -4,7 +4,7 @@
 
 ![](quake.jpg)
 
-TL;DR: I made Quake run on MP3 players. Read how it happened.
+**TL;DR** I made Quake run on MP3 players. Read how it happened.
 
 I spent part of this summer playing with two of my favorite things:
 [Rockbox](https://rockbox.org) and id Software's
@@ -36,19 +36,19 @@ Not only do we aim to replicate the original firmware's functionality,
 we support loadable extensions called *plugins* -- small programs to
 run on your MP3 player. Rockbox already has a bunch of nifty games and
 demos, the most impressive of which were probably the first-person
-shooters *[Doom](https://www.rockbox.org/wiki/PluginDoom)* and *[Duke
-Nukem 3D](https://www.rockbox.org/wiki/PluginDuke3D)*. But I still
-felt there was something missing.
+shooters [Doom](https://www.rockbox.org/wiki/PluginDoom) and [Duke
+Nukem 3D](https://www.rockbox.org/wiki/PluginDuke3D). But I still felt
+there was something missing.
 
 ## Enter Quake
 
 Quake is a fully 3D first-person shooter. Let's break that down. They
-key words there are *fully 3D*, as opposed to *Doom* and *Duke Nukem
-3D*, both of which are usually considered *2.5D* -- imagine a 2D map
-with an additional height component. Quake, on the other hand, is
-fully 3D. Every vertex and polygon exists in 3-space. What this means
-is that the old pseudo-3D tricks no longer work -- performance will
-suffer. Anyhow, I digress. In short, Quake is the Real Deal™.
+key words there are *fully 3D*, as opposed to Doom and Duke Nukem 3D,
+both of which are usually considered *2.5D* -- imagine a 2D map with
+an additional height component. Quake, on the other hand, is fully
+3D. Every vertex and polygon exists in 3-space. What this means is
+that the old pseudo-3D tricks no longer work -- everything is now
+full-blown 3D. Anyhow, I digress. In short, Quake is the Real Deal™.
 
 Quake is no joke, either. Some research showed that Quake "requires" a
 ~100 MHz x86 with a FPU and ~32 MB of RAM. Before you chuckle, keep in
@@ -63,8 +63,8 @@ marginal when it comes to running Quake.
 
 ## The Port
 
-There exists a wonderful version of Quake which runs on SDL. It is
-called, unsurprisingly,
+There exists a wonderful version of Quake which runs on
+[SDL](https://libsdl.org). It is called, unsurprisingly,
 [SDLQuake](https://www.libsdl.org/projects/quake/). Thankfully, I
 already ported the SDL library to Rockbox (that's for another
 article), so getting Quake to compile was rather straightforward, if
@@ -117,75 +117,76 @@ too. The sound output still sounded like a 2-cycle lawnmower, but hey
 ## Down the Rabbit Hole
 
 This project finally gave me an excuse to do something I'd been
-putting off for a while: learn ARM assembly language. The application
-was in a performance-sensitive sound mixing loop in `snd_mix.c`. A
-`SND_PaintChannelFrom8` function took an array of 8-bit mono sound
-samples and produced a 16-bit stereo stream, with left and right
-channels scaled independently. Here's the assembly version I churned
-out after a couple hours (C version follows):
+putting off for a while: learn ARM assembly language.
+
+The application was in a performance-sensitive sound mixing loop in
+`snd_mix.c` (remember the lawnmower-like sound?).
+
+The `SND_PaintChannelFrom8` function takes an array of 8-bit mono
+sound samples and mixes it into an existing 16-bit stereo stream, with
+left and right channels scaled independently based on two integer
+parameters. GCC was doing a terrible job at optimizing the saturation
+arithmetic, so I took a shot at it myself. I rather like how it turned
+out.
+
+Here's the assembly version I came up with (C version follows):
 
 ```
 SND_PaintChannelFrom8:
-        // r0: int true_lvol
-        // r1: int true_rvol
-        // r2: char *sfx
-        // r3: int count
+        ;; r0: int true_lvol
+        ;; r1: int true_rvol
+        ;; r2: char *sfx
+        ;; r3: int count
 
         stmfd sp!, {r4, r5, r6, r7, r8, sl}
 
         ldr ip, =paintbuffer
         ldr ip, [ip]
 
-        mov r0, r0, asl #16 // pre-scale both volumes by 2^16
+        mov r0, r0, asl #16					; prescale by 2^16
         mov r1, r1, asl #16
 
-        sub r3, r3, #1 // we'll count backwards
-        // sl = 0xffff0000
-        ldrh sl, =0xffff
+        sub r3, r3, #1						; count backwards
 
-.loop:
-        ldrsb r4, [r2, r3] // load *sfx[i] -> r4
+        ldrh sl, =0xffff 					; halfword mask
 
-        // keep endianness in mind here
-        // buffer looks like [left_0, left_1, right_0, right_1] in memory
-        // but it is loaded as [right1, right0, left1, left0] to registers
-        ldr r8, [ip, r3, lsl #2] // load paintbuffer[0:1] = RIGHTCHANNEL:LEFTCHANNEL
+1:
+        ldrsb r4, [r2, r3]					; load input sample
+        ldr r8, [ip, r3, lsl #2]				; load output sample pair from paintbuffer
+								; (left:right in memory -> right:left in register)
+        ;; right channel (high half)
+        mul r5, r4, r1						; scaledright = sfx[i] * (true_rvol << 16) -- bottom half is zero
+        qadd r7, r5, r8						; right = scaledright + right (in high half of word)
+        bic r7, r7, sl						; zero bottom half of r7
 
-        // handle high half (right channel) first
-        mul r5, r4, r1 // SCALEDRIGHT = SFXI * (true_rvol << 16) -- bottom half is zero
+        ;; left channel (low half)
+        mul r5, r4, r0						; scaledleft = sfx[i] * (true_rvol << 16)
+        mov r8, r8, lsl #16					; extract original left channel from paintbuffer
+        qadd r8, r5, r8						; left = scaledleft + left
 
-        // r7 holds right channel in high half (dirty bottom half)
-        qadd r7, r5, r8 // RIGHTCHANORIG = SCALEDRIGHT + RIGHTCHANORIG (high half)
+        orr r7, r7, r8, lsr #16					; combine right:left in r7
+        str r7, [ip, r3, lsl #2]				; write right:left to output buffer
+        subs r3, r3, #1	     					; decrement and loop
 
-        bic r7, r7, sl // zero bottom bits of r7
-
-        // trash r5, r6 and handle left channel
-        mul r5, r4, r0 // SCALEDLEFT = SFXI * (true_rvol << 16)
-
-        mov r8, r8, lsl #16 // extract original left channel from paintbuffer
-
-        // r8 holds left channel in high half with zero bottom half
-        qadd r8, r5, r8
-
-        // combine the two 16-bit samples in r7 as 32-bit [left:right]
-        // (use lsr to not sign-extend the lower half)
-        orr r7, r7, r8, lsr #16
-
-        str r7, [ip, r3, lsl #2] // write 32-bit to paintbuffer
-        subs r3, r3, #1
-        bgt .loop // must use instead of bne because of the corner case count=1
+        bgt 1b							; must use bgt instead of bne in case count=1
 
         ldmfd sp!, {r4, r5, r6, r7, r8, sl}
 
         bx lr
 ```
 
-There's some hackery going on here. I'm using the ARM DSP `qadd`
-instruction to get saturation addition for cheap, but `qadd` only
-works with 32-bit words, and the sound samples are 16 bits. The hack,
-then, is to first shift the samples left by 16; `qadd` the samples;
-and shift them back. This accomplishes in one instruction what GCC
-took seven to do.
+There's some hackery going on here that could use some explaining. I'm
+using the ARM `qadd` DSP instruction to get saturation addition for
+cheap, but `qadd` only works with 32-bit words, and the sound samples
+are 16 bits. The hack, then, is to first shift the samples left by 16
+bits; `qadd` the samples together; and then shift them back. This
+accomplishes in one instruction what GCC took seven to do. (Sure, I
+could've avoided this hack altogether if I were working with ARMv6,
+which has MMX-esque packed saturation arithmetic with `qadd16`, but
+alas -- life isn't so easy. And besides, it was a cool hack!)
+
+Notice also that I'm reading and writing two stereo samples at a time
+(with a word-sized `ldr` and `str`) to save a couple more cycles.
 
 The C version is below for reference:
 
@@ -210,20 +211,21 @@ void SND_PaintChannelFrom8 (int true_lvol, int true_rvol, signed char *sfx, int 
 
 I calculated about a 60% improvement in instructions/cycle over the
 optimized C version. Most of the saved cycles come from using `qadd`
-and packing two 16-bit samples in a 32-bit read and write.
+for saturation arithmetic and packing of memory operations.
 
 ### A "Prime" Conspiracy
 
-You'll notice the assembly listing has a comment by the `bgt`
-instruction (branch if greater than) noting that `bne` (branch if not
-equal) cannot be used because of a corner case that freezes if the
-sample count is 1. This will lead to an integer wraparound to
-`0xFFFFFFFF` and an extremely long delay (that will eventually resolve
-itself).
+Here's another interesting bug I ran into along the way. You'll notice
+the assembly listing has a comment by the `bgt` instruction (branch if
+greater than) noting that `bne` (branch if not equal) cannot be used
+because of a corner case that freezes if the sample count is 1. This
+will lead to an integer wraparound to `0xFFFFFFFF` and an extremely
+long delay (which will eventually resolve itself).
 
 This corner case was triggered by one sound in particular, of 7325
-samples in length (the sound triggered by a 100 health pickup). What's
-so special about 7325, you ask? Try taking it modulo any power of two:
+samples in length (the sound triggered by a 100 health pickup,
+incidentally). What's so special about 7325, you ask? Try taking it
+modulo any power of two:
 
 ```
 7325 % 2 = 1
@@ -240,9 +242,12 @@ so special about 7325, you ask? Try taking it modulo any power of two:
 7325 % 4096 = 3229
 ```
 
-Notice anything? That's right -- by some coincidence, 7325 prime
-whenever taken modulo a power of two. This leads to the sound mixing
-code being passed a one-sample array, causing the freeze.
+*5, 13, 29, 157*...
+
+Notice anything? That's right -- by some coincidence, 7325 is prime
+whenever taken modulo a power of two. This *somehow* (I'm actually not
+sure exactly how) leads to the sound mixing code being passed a
+one-sample array, triggering the corner case and freeze.
 
 I spent at least a day rooting out this bug, only to find that it all
 came down to *one* wrong instruction. Life is like that sometimes,
@@ -252,6 +257,13 @@ isn't it?
 
 I've omitted a couple interesting things here for the sake of
 space. There is, for example, the race condition that occured only
-when gibbing a zombie. Or the assorted alignment issues and the
-micro-optimizations for rendering. But those are for another time. For
+when gibbing a zombie but only when the audio sample rate was 44.1
+kHz. (This was a result of the sound thread trying to load a sound --
+a explosion -- while the model loader tried to load the gib
+model. These two sections relied on a common function that relied on
+the same global variable.) And then there's the assorted alignment
+issues (love 'ya, ARM!) and the rendering micro-optimizations I made
+to squeeze out a few more frames. But those are for another time. For
 now, it is time to say goodbye to Quake -- it's been good to me.
+
+So long, and thanks for all the fish!
