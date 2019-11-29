@@ -1,6 +1,6 @@
 # Adieu, Quake!
 
-[![Quake on Rockbox](http://img.youtube.com/vi/74i8aBOmyos/0.jpg)](http://www.youtube.com/watch?v=74i8aBOmyos "Quake on Rockbox")
+[![Quake on Rockbox](http://img.youtube.com/vi/74i8aBOmyos/0.jpg)](http://www.youtube.com/watch?v=74i8aBOmyos)
 
 ![](quake.jpg)
 
@@ -209,7 +209,7 @@ void SND_PaintChannelFrom8 (int true_lvol, int true_rvol, signed char *sfx, int 
 }
 ```
 
-I calculated about a 60% improvement in instructions/cycle over the
+I calculated about a 60% improvement in instructions/sample over the
 optimized C version. Most of the saved cycles come from using `qadd`
 for saturation arithmetic and packing of memory operations.
 
