@@ -1,6 +1,6 @@
-# On Opening Black Boxes or: How I Learned to Stop Worrying and Love G-Code
+# On Opening Black Boxes or: How I Learned to Stop Worrying and Love G-Code {#top}
 
-![Baby Yoda, engraved.](baby-yoda.png)
+![Baby Yoda, engraved. ([G-code](baby-yoda.nc))](baby-yoda.png)
 
 **TL;DR** PhotoVCarve should not cost $149. I made [my own](https://github.com/built1n/rastercarve).
 
@@ -28,14 +28,15 @@ that couldn't be done in a couple lines of Python,* I thought.
 
 The first step in the process was figuring out *how* to control a CNC
 machine. Some Googling told me that virtually all machines read
-"G-code", a sequence of alphanumeric instructions that command the
-movement of the tool in 3 dimensions. It looks something like this:
+[G-code](https://en.wikipedia.org/wiki/G-code), a sequence of
+alphanumeric instructions that command the movement of the tool in 3
+dimensions. It looks something like this:
 
-```
+~~~ {.numberLines}
 G00 X0 Y0 Z0.2
 G01 Z-0.2 F10
 G01 X1.0 Y0
-```
+~~~
 
 These three commands tell the machine to:
 
@@ -57,24 +58,61 @@ perhaps a total of 4 hours from my initial proof-of-concept to the
 current viable prototype. There were no major hiccups this time
 around, and even though I'm still in the process of learning it,
 Python made things *so* much easier than C (or God forbid -- [ARM
-assembly](adieu-quake.html)).
+assembly](adieu-quake.html#asm-listing)).
 
 The heart of my program is a function,
-[`engraveLine`](http://fwei.tk/git/rastercarve/tree/src/rastercarve.py?id=c2de4a3258c3e37d4b49a41d786eef936262f137#n118),
+[`engraveLine`](http://fwei.tk/git/rastercarve/tree/src/rastercarve.py?id=c2de4a3258c3e37d4b49a41d786eef936262f137#n118) (below),
 which outputs the G-code to engrave one "groove" across the image. It
 takes in a initial position vector on the border of the image, and a
 direction vector telling it which way to cut.
 
+~~~ {.python .numberLines}
+# Engrave one line across the image. start and d are vectors in the
+# output space representing the start point and direction of
+# machining, respectively. start should be on the border of the image,
+# and d should point INTO the image.
+def engraveLine(img_interp, img_size, ppi, start, d, step = LINEAR_RESOLUTION):
+    v = start
+    d = d / np.linalg.norm(d)
+
+    if not inBounds(img_size, v):
+        print("NOT IN BOUNDS (PROGRAMMING ERROR): ", img_size, v, file=sys.stderr)
+
+    moveZ(SAFE_Z)
+    moveRapidXY(v[0], v[1])
+
+    first = True
+
+    while inBounds(img_size, v):
+        img_x = int(round(v[0] * ppi))
+        img_y = int(round(v[1] * ppi))
+        x, y = v
+        depth = getDepth(getPix(img_interp, img_x, img_y))
+        if not first:
+            move(x, y, depth)
+        else:
+            first = False
+            moveSlow(x, y, depth)
+
+        v += step * d
+    # return last engraved point
+    return v - step * d
+~~~
+
 After this was written, it was a simple exercise to write a driver
 function to call `engraveLine` with the right vectors in the right
-sequence -- and that was all it took! (I really wonder how Vectric
+sequence -- and that was all it took![^1] (I really wonder how Vectric
 manages to charge $149 for this...)
 
 I fired up the program on a test image and fed its output into
-ShopBot's excellent G-code previewer. Success (see above)! I added a
+ShopBot's excellent G-code previewer. [Success](#top)! I added a
 couple of tweaks (getting the lines to cut at an angle was fun) and I
 christened the program
 [*RasterCarve*](https://github.com/built1n/rastercarve).
+
+The G-code that produced the image at the top of this post is
+[here](baby-yoda.nc). Xander Luciano has an excellent online
+[simulator](https://ncviewer.com) which can preview this toolpath.
 
 ## Conclusion
 
@@ -83,3 +121,7 @@ opening up black boxes." G-code, I learned, isn't nearly as hard as it
 might seem. It's all too easy to abstract away the details of a
 technical process, but sometimes the best way to really understand
 something is by opening up the hood and tinkering with it.
+
+[^1]: I'm probably oversimplifying here. There was, in reality, some
+neat vector math to figure out just *where* the "border" of the image
+would be when the grooves were at an angle.

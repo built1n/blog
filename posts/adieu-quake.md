@@ -108,16 +108,18 @@ I traced the data flow back and found where it originated -- a call to
 `Q_atof()` -- the classic string to float converter. And then it
 dawned on me: I had provided a set of wrapper functions, which
 overrode Quake's `Q_atof()` -- and my `atof()` function must've been
-broken. Fixing it was straightforward. I replaced the flawed `atof`
-with a correct one. Et voila! The glorious three-passage introduction
-level loaded flawlessly, and "E1M1: The Slipgate Complex" loaded fine
-too. The sound output still sounded like a 2-cycle lawnmower, but hey
--- I'd gotten Quake to boot on an MP3 player!
+broken. Fixing it was straightforward. I
+[replaced](https://git.rockbox.org/?p=rockbox.git;a=blobdiff;f=apps/plugins/sdl/wrappers.c;h=efa29ea7b852becf850e27f7e9d361e1862bf398;hp=ee512dd5737c0b0dfaac271396281d6ba2320dc5;hb=HEAD;hpb=3f59fc8b771625aca9c3aefe03cf1038d8461963)
+my flawed `atof` with a correct one -- the one that shipped with
+Quake. Et voilà! The glorious three-passage introduction level loaded
+flawlessly, and "E1M1: The Slipgate Complex" loaded fine too. The
+sound output still sounded like a 2-cycle lawnmower, but hey -- I'd
+gotten Quake to boot on an MP3 player!
 
 ## Down the Rabbit Hole
 
 This project finally gave me an excuse to do something I'd been
-putting off for a while: learn ARM assembly language.
+putting off for a while: learn ARM assembly language.[^1]
 
 The application was in a performance-sensitive sound mixing loop in
 `snd_mix.c` (remember the lawnmower-like sound?).
@@ -131,7 +133,7 @@ out.
 
 Here's the assembly version I came up with (C version follows):
 
-```
+~~~ {#asm-listing .gnuassembler .numberLines}
 SND_PaintChannelFrom8:
         ;; r0: int true_lvol
         ;; r1: int true_rvol
@@ -173,11 +175,11 @@ SND_PaintChannelFrom8:
         ldmfd sp!, {r4, r5, r6, r7, r8, sl}
 
         bx lr
-```
+~~~
 
 There's some hackery going on here that could use some explaining. I'm
 using the ARM `qadd` DSP instruction to get saturation addition for
-cheap, but `qadd` only works with 32-bit words, and the sound samples
+cheap^[1](#asm-listing-25)^, but `qadd` only works with 32-bit words, and the sound samples
 are 16 bits. The hack, then, is to first shift the samples left by 16
 bits; `qadd` the samples together; and then shift them back. This
 accomplishes in one instruction what GCC took seven to do. (Sure, I
@@ -190,7 +192,7 @@ Notice also that I'm reading and writing two stereo samples at a time
 
 The C version is below for reference:
 
-```
+~~~ {.c .numberLines}
 void SND_PaintChannelFrom8 (int true_lvol, int true_rvol, signed char *sfx, int count)
 {
         int     data;
@@ -207,7 +209,7 @@ void SND_PaintChannelFrom8 (int true_lvol, int true_rvol, signed char *sfx, int 
             paintbuffer[2*i+1] = CLAMPADD(paintbuffer[2*i+1], data * true_rvol);
         }
 }
-```
+~~~
 
 I calculated about a 60% improvement in instructions/sample over the
 optimized C version. Most of the saved cycles come from using `qadd`
@@ -223,24 +225,25 @@ will lead to an integer wraparound to `0xFFFFFFFF` and an extremely
 long delay (which will eventually resolve itself).
 
 This corner case was triggered by one sound in particular, of 7325
-samples in length (the sound triggered by a 100 health pickup,
-incidentally). What's so special about 7325, you ask? Try taking it
+samples in length.[^2] What's so special about 7325, you ask? Try taking it
 modulo any power of two:
 
-```
-7325 % 2 = 1
-7325 % 4 = 1
-7325 % 8 = 5
-7325 % 16 = 13
-7325 % 32 = 29
-7325 % 64 = 29
-7325 % 128 = 29
-7325 % 256 = 157
-7325 % 512 = 157
-7325 % 1024 = 157
-7325 % 2048 = 1181
-7325 % 4096 = 3229
-```
+$$
+\begin{align*}
+7325 &\equiv 1 &\pmod{2} \\
+7325 &\equiv 1 &\pmod{4} \\
+7325 &\equiv 5 &\pmod{8} \\
+7325 &\equiv 13 &\pmod{16} \\
+7325 &\equiv 29 &\pmod{32} \\
+7325 &\equiv 29 &\pmod{64} \\
+7325 &\equiv 29 &\pmod{128} \\
+7325 &\equiv 157 &\pmod{256} \\
+7325 &\equiv 157 &\pmod{512} \\
+7325 &\equiv 157 &\pmod{1024} \\
+7325 &\equiv 1181 &\pmod{2048} \\
+7325 &\equiv 3229 &\pmod{4096}
+\end{align*}
+$$
 
 *5, 13, 29, 157*...
 
@@ -255,6 +258,12 @@ isn't it?
 
 ## Adieu
 
+In the end I ended up packaging this port up as a
+[patch](http://gerrit.rockbox.org/r/#/c/1832/) and merging it into the
+Rockbox mainline, where it resides today. It ships with builds for
+most of the ARM targets with color displays in Rockbox 3.15 and
+later.[^3]
+
 I've omitted a couple interesting things here for the sake of
 space. There is, for example, the race condition that occured only
 when gibbing a zombie but only when the audio sample rate was 44.1
@@ -267,3 +276,21 @@ to squeeze out a few more frames. But those are for another time. For
 now, it is time to say goodbye to Quake -- it's been good to me.
 
 So long, and thanks for all the fish!
+
+[^1]: If you're interested in learning ARM assembly, Tonc's
+[*Whirlwind Tour of ARM
+Assembly*](http://www.coranac.com/tonc/text/asm.htm) is a good (albeit
+slightly outdated and GBA-oriented) place to start. And while you're
+at it, go ahead and get a printout of the [ARM Quick Reference
+Card](http://infocenter.arm.com/help/topic/com.arm.doc.qrc0001l/QRC0001_UAL.pdf).
+
+[^2]: It was the sound triggered by a [100 health
+pickup](r_item2.wav), incidentally.
+
+[^3]: I honestly don't remember exactly which targets do and don't
+support Quake. If you're curious, head over to the [Rockbox
+site](http://rockbox.org) and try installing a build for whatever
+target(s) you might have. And do [let me know](mailto:me@fwei.tk) how
+it runs!  New versions of [Rockbox
+Utility](https://www.rockbox.org/wiki/RockboxUtility) (1.4.1 and
+later) also support automatic installation of the Quake shareware.
