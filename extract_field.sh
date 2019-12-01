@@ -2,4 +2,4 @@
 
 # Usage: ./extract_field.sh DBNAME KEY FIELDIDX
 
-awk 'BEGIN { FS = ":" } $1 == "'"$2"'" { print $'"$3"'}' < $1
+awk 'BEGIN { FS = "_" } $1 == "'"$2"'" { print $'"$3"'}' < $1

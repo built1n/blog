@@ -1,13 +1,18 @@
-# Adieu, Quake!
+% Adieu, Quake!
+%
+% 27 Aug 2019
 
-[![Quake on Rockbox](http://img.youtube.com/vi/74i8aBOmyos/0.jpg)](http://www.youtube.com/watch?v=74i8aBOmyos)
-
-![](quake.jpg)
+<center>
+<figure>
+[![Quake on Rockbox](https://img.youtube.com/vi/74i8aBOmyos/0.jpg){height=300}](https://www.youtube.com/watch?v=74i8aBOmyos)\ ![Quake on the iPod Classic.](quake.jpg){height=300}
+<figcaption>Quake running on an iPod Classic.</figcaption>
+</figure>
+</center>
 
 **TL;DR** I made Quake run on MP3 players. Read how it happened.
 
 I spent part of this summer playing with two of my favorite things:
-[Rockbox](https://rockbox.org) and id Software's
+[Rockbox](https://www.rockbox.org) and id Software's
 [Quake](https://en.wikipedia.org/wiki/Quake_(video_game)). I even got
 the chance to combine the two by porting Quake to run *on* Rockbox!
 What more could I ask?
@@ -25,7 +30,7 @@ months, so I'm trying to get this brain dump in before the deluge.
 
 ## Rockbox
 
-[Rockbox](https://rockbox.org) is a fun open-source project I spend
+[Rockbox](https://www.rockbox.org) is a fun open-source project I spend
 far too much time hacking on. The web page explains it best: "Rockbox
 is a free replacement firmware for digital music players." That's
 right, we provide a complete replacement for the manufacturer's
@@ -37,8 +42,8 @@ we support loadable extensions called *plugins* -- small programs to
 run on your MP3 player. Rockbox already has a bunch of nifty games and
 demos, the most impressive of which were probably the first-person
 shooters [Doom](https://www.rockbox.org/wiki/PluginDoom) and [Duke
-Nukem 3D](https://www.rockbox.org/wiki/PluginDuke3D). But I still felt
-there was something missing.
+Nukem 3D](https://www.rockbox.org/wiki/PluginDuke3D).[^1] But I still
+felt there was something missing.
 
 ## Enter Quake
 
@@ -58,8 +63,9 @@ with CPUs as slow as 11MHz and as little as 2 MB of RAM (of course,
 Quake wasn't going to be running on *those* devices). With this in
 mind, I looked at my ever-shrinking DAP collection and picked out the
 most powerful surviving member: an Apple iPod Classic/6G, with a 216
-MHz ARMv5E and 64 MB of DRAM. Nothing to sneeze at, but certainly
-marginal when it comes to running Quake.
+MHz ARMv5E and 64 MB of DRAM (the *E* indicates the presence of ARM
+DSP extensions -- this will be important later). Nothing to sneeze at,
+but certainly marginal when it comes to running Quake.
 
 ## The Port
 
@@ -84,10 +90,10 @@ avail -- the bug was too hard for me, or so it felt.
 
 And so it remained, for years. I should probably give a little timing
 information at this point. This first attempt at Quake took place in
-September 2017, after which I gave up. My Quake-Rockbox abomination
-sat on a shelf, collecting dust, until July 2019. By just the right
-combination of boredom and motivation, I resolved to finish what I had
-started.
+September 2017, after which I gave up, and my Quake-Rockbox
+abomination sat on a shelf, collecting dust, until July 2019. By just
+the right combination of boredom and motivation, I resolved to finish
+what I had started.
 
 I got to debugging. Now, my flow state is such that I remember
 virtually no details of what exactly I did, but I'll try my best here
@@ -119,7 +125,7 @@ gotten Quake to boot on an MP3 player!
 ## Down the Rabbit Hole
 
 This project finally gave me an excuse to do something I'd been
-putting off for a while: learn ARM assembly language.[^1]
+putting off for a while: learn ARM assembly language.[^2]
 
 The application was in a performance-sensitive sound mixing loop in
 `snd_mix.c` (remember the lawnmower-like sound?).
@@ -178,14 +184,15 @@ SND_PaintChannelFrom8:
 ~~~
 
 There's some hackery going on here that could use some explaining. I'm
-using the ARM `qadd` DSP instruction to get saturation addition for
-cheap^[1](#asm-listing-25)^, but `qadd` only works with 32-bit words, and the sound samples
-are 16 bits. The hack, then, is to first shift the samples left by 16
-bits; `qadd` the samples together; and then shift them back. This
-accomplishes in one instruction what GCC took seven to do. (Sure, I
-could've avoided this hack altogether if I were working with ARMv6,
-which has MMX-esque packed saturation arithmetic with `qadd16`, but
-alas -- life isn't so easy. And besides, it was a cool hack!)
+using the ARM `qadd` DSP instruction to get saturation addition [for
+cheap](#asm-listing-25), but `qadd` only works with 32-bit words, and
+the sound samples are 16 bits. The hack, then, is to first shift the
+samples left by 16 bits; `qadd` the samples together; and then shift
+them back. This accomplishes in one instruction what GCC took seven to
+do. (Sure, I could've avoided this hack altogether if I were working
+with ARMv6, which has MMX-esque packed saturation arithmetic with
+`qadd16`, but alas -- life isn't so easy. And besides, it was a cool
+hack!)
 
 Notice also that I'm reading and writing two stereo samples at a time
 (with a word-sized `ldr` and `str`) to save a couple more cycles.
@@ -225,7 +232,7 @@ will lead to an integer wraparound to `0xFFFFFFFF` and an extremely
 long delay (which will eventually resolve itself).
 
 This corner case was triggered by one sound in particular, of 7325
-samples in length.[^2] What's so special about 7325, you ask? Try taking it
+samples in length.[^3] What's so special about 7325, you ask? Try taking it
 modulo any power of two:
 
 $$
@@ -259,10 +266,11 @@ isn't it?
 ## Adieu
 
 In the end I ended up packaging this port up as a
-[patch](http://gerrit.rockbox.org/r/#/c/1832/) and merging it into the
+[patch](http://gerrit.rockbox.org/r/1832/) and merging it into the
 Rockbox mainline, where it resides today. It ships with builds for
 most of the ARM targets with color displays in Rockbox 3.15 and
-later.[^3]
+later.[^4] If you don't have a supported target, you can
+[watch](https://www.youtube.com/watch?v=74i8aBOmyos) user890104's demo.
 
 I've omitted a couple interesting things here for the sake of
 space. There is, for example, the race condition that occured only
@@ -277,19 +285,23 @@ now, it is time to say goodbye to Quake -- it's been good to me.
 
 So long, and thanks for all the fish!
 
-[^1]: If you're interested in learning ARM assembly, Tonc's
-[*Whirlwind Tour of ARM
-Assembly*](http://www.coranac.com/tonc/text/asm.htm) is a good (albeit
-slightly outdated and GBA-oriented) place to start. And while you're
-at it, go ahead and get a printout of the [ARM Quick Reference
-Card](http://infocenter.arm.com/help/topic/com.arm.doc.qrc0001l/QRC0001_UAL.pdf).
+[^1]: The latter game was the first to use the Rockbox SDL runtime and
+deserves a post of its own. Watch user890104's demo of it
+[here](https://www.youtube.com/watch?v=aEkBJ-fHxhA).
 
-[^2]: It was the sound triggered by a [100 health
+[^2]: If you're interested in learning ARM assembly, Jasper Vijn's
+[*Tonc: Whirlwind Tour of ARM
+Assembly*](https://www.coranac.com/tonc/text/asm.htm) is a good
+(albeit slightly outdated and GBA-oriented) place to start. And while
+you're at it, go ahead and get a printout of the [ARM Quick Reference
+Card](https://infocenter.arm.com/help/topic/com.arm.doc.qrc0001l/QRC0001_UAL.pdf).
+
+[^3]: It was the sound triggered by a [100 health
 pickup](r_item2.wav), incidentally.
 
-[^3]: I honestly don't remember exactly which targets do and don't
+[^4]: I honestly don't remember exactly which targets do and don't
 support Quake. If you're curious, head over to the [Rockbox
-site](http://rockbox.org) and try installing a build for whatever
+site](https://rockbox.org) and try installing a build for whatever
 target(s) you might have. And do [let me know](mailto:me@fwei.tk) how
 it runs!  New versions of [Rockbox
 Utility](https://www.rockbox.org/wiki/RockboxUtility) (1.4.1 and

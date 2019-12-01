@@ -1,6 +1,8 @@
-# On Opening Black Boxes or: How I Learned to Stop Worrying and Love G-Code {#top}
+% On Opening Black Boxes or: How I Learned to Stop Worrying and Love G-Code
+%
+% 28 Nov 2019
 
-![Baby Yoda, engraved. ([G-code](baby-yoda.nc))](baby-yoda.png)
+![Baby Yoda, engraved. ([G-code](baby-yoda.nc))](baby-yoda.png){width=100%}
 
 **TL;DR** PhotoVCarve should not cost $149. I made [my own](https://github.com/built1n/rastercarve).
 
@@ -22,7 +24,11 @@ besides, just see for yourself in the video below: all PhotoVCarve
 does is take an image and draw a bunch of grooves over it -- *nothing
 that couldn't be done in a couple lines of Python,* I thought.
 
-[![PhotoVCarve - Engraving Photographs](http://img.youtube.com/vi/krFyBxYwWW8/0.jpg)](https://www.youtube.com/watch?v=krFyBxYwWW8)
+<center>
+
+[![PhotoVCarve - Engraving Photographs](https://img.youtube.com/vi/krFyBxYwWW8/0.jpg){width=60%}](https://www.youtube.com/watch?v=krFyBxYwWW8)
+
+</center>
 
 ## G-Code
 
@@ -61,7 +67,7 @@ Python made things *so* much easier than C (or God forbid -- [ARM
 assembly](adieu-quake.html#asm-listing)).
 
 The heart of my program is a function,
-[`engraveLine`](http://fwei.tk/git/rastercarve/tree/src/rastercarve.py?id=c2de4a3258c3e37d4b49a41d786eef936262f137#n118) (below),
+[`engraveLine`](https://fwei.tk/git/rastercarve/tree/src/rastercarve.py?id=c2de4a3258c3e37d4b49a41d786eef936262f137#n118) (below),
 which outputs the G-code to engrave one "groove" across the image. It
 takes in a initial position vector on the border of the image, and a
 direction vector telling it which way to cut.
@@ -111,8 +117,9 @@ christened the program
 [*RasterCarve*](https://github.com/built1n/rastercarve).
 
 The G-code that produced the image at the top of this post is
-[here](baby-yoda.nc). Xander Luciano has an excellent online
-[simulator](https://ncviewer.com) which can preview this toolpath.
+[here](baby-yoda.nc). In addition to the ShopBot previewer, Xander
+Luciano has an excellent online [simulator](https://ncviewer.com)
+which can simulate this toolpath.
 
 ## Conclusion
 

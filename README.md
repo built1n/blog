@@ -19,9 +19,12 @@ Assorted files (such as images) can be placed in `files/`.
 Install pandoc.
 
 Run `./build.sh` from the project root. This will produce the compiled
-output in `out`.
+output in `blog-staging`.
 
 ### Deployment
 
 Run `./deploy.sh`. It will try to log into my website. This will not
 work. Edit it for your own needs.
+
+To deploy to *p*roduction, run `./deploy.sh -p`. Again, this will not
+work unless you have my SSH key.
