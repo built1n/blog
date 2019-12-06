@@ -129,6 +129,17 @@ might seem. It's all too easy to abstract away the details of a
 technical process, but sometimes the best way to really understand
 something is by opening up the hood and tinkering with it.
 
+---
+
+## Appendix: Machined Results
+
+Here are some examples of engraving results, along with the
+corresponding G-code files.
+
+![Into the Jaws of Death. 30° carbide engraving bit, .080" maximum depth, 110% stepover. ([G-code](d-day.nc.zip))](d-day.jpg){width=100%}
+
+![Original image. ([Source](https://en.wikipedia.org/wiki/Into_the_Jaws_of_Death#/media/File:Into_the_Jaws_of_Death_23-0455M_edit.jpg))](d-day-orig.jpg){width=100%}
+
 [^1]: I'm probably oversimplifying here. There was, in reality, some
 neat vector math to figure out just *where* the "border" of the image
 would be when the grooves were at an angle.
