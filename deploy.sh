@@ -9,9 +9,8 @@ fi
 
 echo "Copying to staging..."
 tar -czf blog.tar.gz blog-staging
-scp blog.tar.gz root@fwei.tk:
-ssh root@fwei.tk rm -rf /var/www/html/blog-staging
-ssh root@fwei.tk tar -xzvf blog.tar.gz -C /var/www/html
+scp -v blog.tar.gz root@fwei.tk:
+ssh -v root@fwei.tk "rm -rf /var/www/html/blog-staging ; tar -xzvf blog.tar.gz -C /var/www/html"
 rm -f blog.tar.gz
 
 if [[ $# -ge 1 ]] && [[ $1 == "-p" ]]
