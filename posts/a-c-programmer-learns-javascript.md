@@ -253,7 +253,7 @@ result on a piece of material is a shape like this:
 </figure>
 
 The overall path, then, is the result of combining a sequence of these
-shapes with common endpoints. [^2]
+shapes with common endpoints.[^2]
 
 Though this formulation is fairly straightforward to describe
 mathematically, implementing it in code was more difficult than I'd
@@ -318,7 +318,7 @@ The most technically interesting piece of RasterCarve Live ended up
 being the aggressive caching system I built, largely by accident. The
 client-side code first computes a MD5 hash of the user's input image
 and sends that hash in a request, along with the engraving parameters,
-in place of the actual file data. [^4] It works as follows:
+in place of the actual file data.[^4] It works as follows:
 
 1. If the server has served an earlier request (with the exact same
 parameters) on an image with the same hash, simply return the result
